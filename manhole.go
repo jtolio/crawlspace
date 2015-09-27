@@ -44,8 +44,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jtolds/gopher-luar"
-	"github.com/yuin/gopher-lua"
+	"github.com/layeh/gopher-luar"  // pending https://github.com/layeh/gopher-luar/pull/4
+	"github.com/yuin/gopher-lua"  // pending https://github.com/yuin/gopher-lua/pull/53
 )
 
 var (
