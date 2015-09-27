@@ -46,8 +46,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/layeh/gopher-luar"  // pending https://github.com/layeh/gopher-luar/pull/4
-	"github.com/yuin/gopher-lua"  // pending https://github.com/yuin/gopher-lua/pull/53
+	"github.com/layeh/gopher-luar"
+	"github.com/yuin/gopher-lua"
 )
 
 var (
@@ -111,7 +111,6 @@ func (m *Manhole) Unregister(name string) {
 // returning io.EOF or the user entering `quit()`, no error will be returned.
 func (m *Manhole) Interact(in io.Reader, out io.Writer) error {
 	l := lua.NewState(lua.Options{
-		Stdout: out, Stderr: out, Stdin: in,
 		SkipOpenLibs: true})
 	defer l.Close()
 
