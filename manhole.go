@@ -41,6 +41,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -114,11 +116,17 @@ func (m *Manhole) Interact(in io.Reader, out io.Writer) error {
 	defer l.Close()
 
 	m.mtx.Lock()
+	names := make([]string, 0, len(m.registrations)+len(reserved))
 	registrations := make([]func(l *lua.LState), 0, len(m.registrations))
-	for _, reg := range m.registrations {
+	for name, reg := range m.registrations {
+		names = append(names, name)
 		registrations = append(registrations, reg)
 	}
 	m.mtx.Unlock()
+	for name := range reserved {
+		names = append(names, name)
+	}
+	sort.Strings(names)
 	for _, reg := range registrations {
 		reg(l)
 	}
@@ -137,6 +145,12 @@ func (m *Manhole) Interact(in io.Reader, out io.Writer) error {
 		}
 		fmt.Fprintln(out)
 	}))
+
+	_, err := fmt.Fprintf(out, "go-manhole registrations:\n%s\n",
+		strings.Join(names, ", "))
+	if err != nil {
+		return err
+	}
 
 	stdin := bufio.NewReader(in)
 	for !eof {
