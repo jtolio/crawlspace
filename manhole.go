@@ -1,3 +1,18 @@
+// Copyright 2015 JT Olds
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
 /*
 package manhole provides a means to dynamically interact with registered Go
 objects in a live process, using a Lua shell.
@@ -26,11 +41,11 @@ Example usage:
 After running the above program, you can now connect via telnet or netcat
 to localhost:2222, and run the following interaction:
 
-    > x = MyType()
-    > print(x:Get())
+    > x = MyType.new()
+    > print(x.Get())
     0
-    > x:Set(5)
-    > print(x:Get())
+    > x.Set(5)
+    > print(x.Get())
     5
 
 */
@@ -46,8 +61,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/layeh/gopher-luar"
-	"github.com/yuin/gopher-lua"
+	"github.com/Shopify/go-lua"
+	"github.com/jtolds/go-luar"
 )
 
 var (
@@ -57,23 +72,28 @@ var (
 // Manhole is essentially a registry of Go values to expose via a remote shell.
 type Manhole struct {
 	mtx           sync.Mutex
-	registrations map[string]func(*lua.LState)
+	registrations map[string]func(*lua.State) error
 }
 
 func (m *Manhole) register(name string, val interface{},
-	mapper func(l *lua.LState, val interface{}) lua.LValue) error {
+	pusher func(l *lua.State, val interface{}) error) error {
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
 	if m.registrations == nil {
-		m.registrations = map[string]func(*lua.LState){}
+		m.registrations = map[string]func(*lua.State) error{}
 	}
 
 	_, exists := m.registrations[name]
 	if exists || reserved[name] {
 		return fmt.Errorf("Registration %#v already exists", name)
 	}
-	m.registrations[name] = func(l *lua.LState) {
-		l.SetGlobal(name, mapper(l, val))
+	m.registrations[name] = func(l *lua.State) error {
+		err := pusher(l, val)
+		if err != nil {
+			return err
+		}
+		l.SetGlobal(name)
+		return nil
 	}
 	return nil
 }
@@ -84,7 +104,7 @@ func (m *Manhole) register(name string, val interface{},
 //   m.RegisterType("MyType", MyType{})
 // Applies to all future manhole sessions, but not already started ones.
 func (m *Manhole) RegisterType(name string, example interface{}) error {
-	return m.register(name, example, luar.NewType)
+	return m.register(name, example, luar.PushType)
 }
 
 // RegisterVal registers the value `value` using the global name `name`.
@@ -92,7 +112,7 @@ func (m *Manhole) RegisterType(name string, example interface{}) error {
 //   m.RegisterVal("x", x)
 // Applies to all future manhole sessions, but not already started ones.
 func (m *Manhole) RegisterVal(name string, value interface{}) error {
-	return m.register(name, value, luar.New)
+	return m.register(name, value, luar.PushValue)
 }
 
 // Unregister removes the previously-registered global name `name` from all
@@ -110,13 +130,12 @@ func (m *Manhole) Unregister(name string) {
 // there is an error, or the user runs `quit()`. In the case of the input
 // returning io.EOF or the user entering `quit()`, no error will be returned.
 func (m *Manhole) Interact(in io.Reader, out io.Writer) error {
-	l := lua.NewState(lua.Options{
-		SkipOpenLibs: true})
-	defer l.Close()
+	l := lua.NewState()
+	luar.SetOptions(l, luar.Options{AllowUnexportedAccess: true})
 
 	m.mtx.Lock()
 	names := make([]string, 0, len(m.registrations)+len(reserved))
-	registrations := make([]func(l *lua.LState), 0, len(m.registrations))
+	registrations := make([]func(l *lua.State) error, 0, len(m.registrations))
 	for name, reg := range m.registrations {
 		names = append(names, name)
 		registrations = append(registrations, reg)
@@ -127,15 +146,28 @@ func (m *Manhole) Interact(in io.Reader, out io.Writer) error {
 	}
 	sort.Strings(names)
 	for _, reg := range registrations {
-		reg(l)
+		err := reg(l)
+		if err != nil {
+			return err
+		}
 	}
 
 	eof := false
-	l.SetGlobal("quit", luar.New(l, func() { eof = true }))
-	l.SetGlobal("print", luar.New(l, func(vals ...interface{}) {
+	err := luar.PushValue(l, func() { eof = true })
+	if err != nil {
+		return err
+	}
+	l.SetGlobal("quit")
+
+	err = luar.PushValue(l, func(vals ...interface{}) {
 		fmt.Fprintln(out, vals...)
-	}))
-	l.SetGlobal("repr", luar.New(l, func(vals ...interface{}) {
+	})
+	if err != nil {
+		return err
+	}
+	l.SetGlobal("print")
+
+	err = luar.PushValue(l, func(vals ...interface{}) {
 		for i, val := range vals {
 			fmt.Fprintf(out, "%#v", val)
 			if i > 0 {
@@ -143,9 +175,13 @@ func (m *Manhole) Interact(in io.Reader, out io.Writer) error {
 			}
 		}
 		fmt.Fprintln(out)
-	}))
+	})
+	if err != nil {
+		return err
+	}
+	l.SetGlobal("repr")
 
-	_, err := fmt.Fprintf(out, "go-manhole registrations:\n%s\n",
+	_, err = fmt.Fprintf(out, "go-manhole registrations:\n%s\n",
 		strings.Join(names, ", "))
 	if err != nil {
 		return err
@@ -162,7 +198,7 @@ func (m *Manhole) Interact(in io.Reader, out io.Writer) error {
 		if err != nil && !eof {
 			return err
 		}
-		err = l.DoString(line)
+		err = lua.DoString(l, line)
 		if err != nil {
 			_, err = fmt.Fprintf(out, "%v\n", err)
 			if err != nil {

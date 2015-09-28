@@ -14,7 +14,7 @@ Example usage:
 package main
 
 import (
-  "github.com/jtolds/go-manhole"
+	"github.com/jtolds/go-manhole"
 )
 
 type MyType struct{ x int }
@@ -23,8 +23,8 @@ func (m *MyType) Set(x int) { m.x = x }
 func (m *MyType) Get() int  { return m.x }
 
 func main() {
-  manhole.RegisterType("MyType", MyType{})
-  panic(manhole.ListenAndServe(2222))
+	manhole.RegisterType("MyType", MyType{})
+	panic(manhole.ListenAndServe(2222))
 }
 ```
 
@@ -32,11 +32,11 @@ After running the above program, you can now connect via telnet or netcat
 to localhost:2222, and run the following interaction:
 
 ```
-> x = MyType()
-> print(x:Get())
+> x = MyType.new()
+> print(x.Get())
 0
-> x:Set(5)
-> print(x:Get())
+> x.Set(5)
+> print(x.Get())
 5
 ```
 
