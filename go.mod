@@ -1,6 +1,6 @@
 module github.com/jtolio/crawlspace
 
-go 1.21.0
+go 1.16
 
 require (
 	github.com/Shopify/go-lua v0.0.0-20221004153744-91867de107cf
