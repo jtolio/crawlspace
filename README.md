@@ -1,11 +1,11 @@
-# go-manhole
+# crawlspace
 
-https://godoc.org/github.com/jtolds/go-manhole
+https://pkg.go.dev/github.com/jtolio/crawlspace
 
-package manhole provides a means to dynamically interact with registered Go
+package crawlspace provides a means to dynamically interact with registered Go
 objects in a live process, using a Lua shell.
 
-Inspiration is mainly from Twisted's library of the same name:
+Inspiration is mainly from Twisted's manhole library:
 https://twistedmatrix.com/documents/current/api/twisted.conch.manhole.html
 
 Example usage:
@@ -14,7 +14,7 @@ Example usage:
 package main
 
 import (
-	"github.com/jtolds/go-manhole"
+	"github.com/jtolds/crawlspace"
 )
 
 type MyType struct{ x int }
@@ -23,8 +23,8 @@ func (m *MyType) Set(x int) { m.x = x }
 func (m *MyType) Get() int  { return m.x }
 
 func main() {
-	manhole.RegisterType("MyType", MyType{})
-	panic(manhole.ListenAndServe(2222))
+	crawlspace.RegisterType("MyType", MyType{})
+	panic(crawlspace.ListenAndServe(2222))
 }
 ```
 
@@ -40,4 +40,4 @@ to localhost:2222, and run the following interaction:
 5
 ```
 
-Copyright 2015, JT Olds. Licensed under Apache License 2.0
+Copyright 2015-2023, JT Olds. Licensed under Apache License 2.0
