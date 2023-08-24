@@ -3,7 +3,7 @@
 https://pkg.go.dev/github.com/jtolio/crawlspace
 
 package crawlspace provides a means to dynamically interact with registered Go
-objects in a live process, using a Lua shell.
+objects in a live process, using a github.com/mattn/anko shell.
 
 Inspiration is mainly from Twisted's manhole library:
 https://twistedmatrix.com/documents/current/api/twisted.conch.manhole.html
@@ -32,7 +32,7 @@ After running the above program, you can now connect via telnet or netcat
 to localhost:2222, and run the following interaction:
 
 ```
-> x = MyType.new()
+> x = make(MyType)
 > print(x.Get())
 0
 > x.Set(5)
