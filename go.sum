@@ -1,5 +1,5 @@
 github.com/Shopify/go-lua v0.0.0-20191113154418-05ce435a9edd/go.mod h1:lvS2IGWEGk+KQkRrCXuWlcsHO5BitT0HyhnP51rh3gA=
 github.com/Shopify/go-lua v0.0.0-20221004153744-91867de107cf h1:VSUCKpFV0AfYGslgQSRdBI9HCVp1TCXJmScWD0VXL5g=
 github.com/Shopify/go-lua v0.0.0-20221004153744-91867de107cf/go.mod h1:UCCi6u6YA8oXfJ15vEMiMGIaWWfLiOacinBPHxLXtEU=
-github.com/jtolds/go-luar v0.0.0-20200310225017-6fa637b8208b h1:iysoJb49jGUYo8QuZEa/3JjCpgxeZZy8x3c2465cjuA=
-github.com/jtolds/go-luar v0.0.0-20200310225017-6fa637b8208b/go.mod h1:UwIGIJbOORRy7+4CFdO5gF6ghf3/tgtR7HvrG5RLEOU=
+github.com/jtolds/go-luar v0.0.0-20230824215209-35982da2a25e h1:iJE6rsteTOgOZ3Wdx8G4I2B4eqPNhnKJNqS90/y1QJw=
+github.com/jtolds/go-luar v0.0.0-20230824215209-35982da2a25e/go.mod h1:UwIGIJbOORRy7+4CFdO5gF6ghf3/tgtR7HvrG5RLEOU=
