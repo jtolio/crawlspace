@@ -52,6 +52,7 @@ package crawlspace
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -196,10 +197,18 @@ func (m *Crawlspace) Interact(in io.Reader, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		line, err := stdin.ReadString('\n')
-		eof = err == io.EOF
-		if err != nil && !eof {
-			return err
+		var line string
+		for {
+			line, err = stdin.ReadString('\n')
+			eof = errors.Is(err, io.EOF)
+			line = strings.TrimSpace(line)
+			empty := len(line) == 0
+			if err != nil && (!eof || empty) {
+				return err
+			}
+			if !empty {
+				break
+			}
 		}
 		err = lua.DoString(l, line)
 		if err != nil {
@@ -249,7 +258,7 @@ func (m *Crawlspace) Serve(l net.Listener) error {
 		delay = 0
 		go func() {
 			defer conn.Close()
-			m.Interact(conn, conn)
+			m.Interact(&eotTranslate{conn}, conn)
 		}()
 	}
 }
@@ -264,3 +273,18 @@ var (
 	Serve          = Default.Serve
 	ListenAndServe = Default.ListenAndServe
 )
+
+type eotTranslate struct {
+	data io.Reader
+}
+
+const asciiEOT = 0x04
+
+func (w *eotTranslate) Read(p []byte) (n int, err error) {
+	n, err = w.data.Read(p)
+	if err == nil && n > 0 && p[n-1] == asciiEOT {
+		err = io.EOF
+		n--
+	}
+	return n, err
+}
