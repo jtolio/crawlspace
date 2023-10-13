@@ -15,7 +15,8 @@
 
 /*
 package crawlspace provides a means to dynamically interact with registered Go
-objects in a live process, using a Lua shell.
+objects in a live process, using small scripting language based around the
+reflect package.
 
 Inspiration is mainly from Twisted's manhole library:
 https://twistedmatrix.com/documents/current/api/twisted.conch.manhole.html
@@ -34,18 +35,17 @@ Example usage:
 	func (m *MyType) Get() int  { return m.x }
 
 	func main() {
-	  crawlspace.RegisterType("MyType", MyType{})
+	  crawlspace.RegisterVal("x", &MyType{})
 	  panic(crawlspace.ListenAndServe(2222))
 	}
 
 After running the above program, you can now connect via telnet or netcat
 to localhost:2222, and run the following interaction:
 
-	> x = MyType.new()
-	> print(x.Get())
+	> x.Get()
 	0
 	> x.Set(5)
-	> print(x.Get())
+	> x.Get()
 	5
 */
 package crawlspace
@@ -56,140 +56,39 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"sort"
+	"reflect"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/Shopify/go-lua"
-	"github.com/jtolds/go-luar"
+	"github.com/jtolio/crawlspace/reflectlang"
 )
 
-var (
-	reserved = map[string]bool{"quit": true, "print": true, "repr": true}
-)
-
-// Crawlspace is essentially a registry of Go values to expose via a remote shell.
+// Crawlspace is a registry of Go values to expose via a remote shell.
 type Crawlspace struct {
-	mtx           sync.Mutex
-	registrations map[string]func(*lua.State) error
+	env func(out io.Writer) reflectlang.Environment
 }
 
-func (m *Crawlspace) register(name string, val interface{},
-	pusher func(l *lua.State, val interface{}) error) error {
-	m.mtx.Lock()
-	defer m.mtx.Unlock()
-	if m.registrations == nil {
-		m.registrations = map[string]func(*lua.State) error{}
-	}
-
-	_, exists := m.registrations[name]
-	if exists || reserved[name] {
-		return fmt.Errorf("Registration %#v already exists", name)
-	}
-	m.registrations[name] = func(l *lua.State) error {
-		err := pusher(l, val)
-		if err != nil {
-			return err
-		}
-		l.SetGlobal(name)
-		return nil
-	}
-	return nil
-}
-
-// RegisterType registers the type with example value `example` using the
-// global name `name`.
-// Example:
-//
-//	m.RegisterType("MyType", MyType{})
-//
-// Applies to all future crawlspace sessions, but not already started ones.
-func (m *Crawlspace) RegisterType(name string, example interface{}) error {
-	return m.register(name, example, luar.PushType)
-}
-
-// RegisterVal registers the value `value` using the global name `name`.
-// Example:
-//
-//	m.RegisterVal("x", x)
-//
-// Applies to all future crawlspace sessions, but not already started ones.
-func (m *Crawlspace) RegisterVal(name string, value interface{}) error {
-	return m.register(name, value, luar.PushValue)
-}
-
-// Unregister removes the previously-registered global name `name` from all
-// future crawlspace sessions.
-func (m *Crawlspace) Unregister(name string) {
-	m.mtx.Lock()
-	defer m.mtx.Unlock()
-	if m.registrations == nil {
-		return
-	}
-	delete(m.registrations, name)
+// New makes a new crawlspace using the environment constructor env.
+// If env is null, reflectlang.Environment{} is used.
+// procdebug.Env is perhaps a more useful choice.
+func New(env func(out io.Writer) reflectlang.Environment) *Crawlspace {
+	return &Crawlspace{env: env}
 }
 
 // Interact takes input from `in` and returns output to `out`. It runs until
 // there is an error, or the user runs `quit()`. In the case of the input
 // returning io.EOF or the user entering `quit()`, no error will be returned.
 func (m *Crawlspace) Interact(in io.Reader, out io.Writer) error {
-	l := lua.NewState()
-	luar.SetOptions(l, luar.Options{AllowUnexportedAccess: true})
-
-	m.mtx.Lock()
-	names := make([]string, 0, len(m.registrations)+len(reserved))
-	registrations := make([]func(l *lua.State) error, 0, len(m.registrations))
-	for name, reg := range m.registrations {
-		names = append(names, name)
-		registrations = append(registrations, reg)
-	}
-	m.mtx.Unlock()
-	for name := range reserved {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, reg := range registrations {
-		err := reg(l)
-		if err != nil {
-			return err
-		}
-	}
-
+	env := m.env(out)
 	eof := false
-	err := luar.PushValue(l, func() { eof = true })
-	if err != nil {
-		return err
-	}
-	l.SetGlobal("quit")
-
-	err = luar.PushValue(l, func(vals ...interface{}) {
-		fmt.Fprintln(out, vals...)
-	})
-	if err != nil {
-		return err
-	}
-	l.SetGlobal("print")
-
-	err = luar.PushValue(l, func(vals ...interface{}) {
-		for i, val := range vals {
-			fmt.Fprintf(out, "%#v", val)
-			if i > 0 {
-				fmt.Fprintf(out, " ")
-			}
+	env["quit"] = reflect.ValueOf(func() { eof = true })
+	var lastvals []reflect.Value
+	env["_"] = reflectlang.LowerFunc(env, func(args []reflect.Value) ([]reflect.Value, error) {
+		if len(args) != 0 {
+			return nil, fmt.Errorf("unexpected argument")
 		}
-		fmt.Fprintln(out)
+		return lastvals, nil
 	})
-	if err != nil {
-		return err
-	}
-	l.SetGlobal("repr")
-
-	_, err = fmt.Fprintf(out, "crawlspace registrations:\n%s\n",
-		strings.Join(names, ", "))
-	if err != nil {
-		return err
-	}
 
 	stdin := bufio.NewReader(in)
 	for !eof {
@@ -210,13 +109,20 @@ func (m *Crawlspace) Interact(in io.Reader, out io.Writer) error {
 				break
 			}
 		}
-		err = lua.DoString(l, line)
+		rv, err := reflectlang.Eval(line, env)
 		if err != nil {
 			_, err = fmt.Fprintf(out, "%v\n", err)
 			if err != nil {
 				return err
 			}
 			continue
+		}
+		lastvals = rv
+		for _, val := range rv {
+			_, err = fmt.Fprintf(out, "%#v\n", val)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -262,17 +168,6 @@ func (m *Crawlspace) Serve(l net.Listener) error {
 		}()
 	}
 }
-
-var (
-	Default = &Crawlspace{}
-
-	RegisterType   = Default.RegisterType
-	RegisterVal    = Default.RegisterVal
-	Unregister     = Default.Unregister
-	Interact       = Default.Interact
-	Serve          = Default.Serve
-	ListenAndServe = Default.ListenAndServe
-)
 
 type eotTranslate struct {
 	data io.Reader
