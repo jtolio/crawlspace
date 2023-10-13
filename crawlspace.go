@@ -20,33 +20,6 @@ reflect package.
 
 Inspiration is mainly from Twisted's manhole library:
 https://twistedmatrix.com/documents/current/api/twisted.conch.manhole.html
-
-Example usage:
-
-	package main
-
-	import (
-	  "github.com/jtolds/crawlspace"
-	)
-
-	type MyType struct{ x int }
-
-	func (m *MyType) Set(x int) { m.x = x }
-	func (m *MyType) Get() int  { return m.x }
-
-	func main() {
-	  crawlspace.RegisterVal("x", &MyType{})
-	  panic(crawlspace.ListenAndServe(2222))
-	}
-
-After running the above program, you can now connect via telnet or netcat
-to localhost:2222, and run the following interaction:
-
-	> x.Get()
-	0
-	> x.Set(5)
-	> x.Get()
-	5
 */
 package crawlspace
 
@@ -69,9 +42,12 @@ type Crawlspace struct {
 }
 
 // New makes a new crawlspace using the environment constructor env.
-// If env is null, reflectlang.Environment{} is used.
-// procdebug.Env is perhaps a more useful choice.
+// If env is nil, reflectlang.Environment{} is used.
+// github.com/jtolio/crawlspace/tools.Env is perhaps a more useful choice.
 func New(env func(out io.Writer) reflectlang.Environment) *Crawlspace {
+	if env == nil {
+		env = func(io.Writer) reflectlang.Environment { return reflectlang.Environment{} }
+	}
 	return &Crawlspace{env: env}
 }
 
