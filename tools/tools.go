@@ -179,7 +179,17 @@ func Env(out io.Writer) reflectlang.Environment {
 			iargs = append(iargs, arg.Interface())
 		}
 
-		return troop.Call(args[0].String()+"."+args[1].String(), iargs...)
+		results, err := troop.Call(args[0].String()+"."+args[1].String(), iargs...)
+		if err != nil {
+			return nil, err
+		}
+
+		var iresults []reflect.Value
+		for _, res := range results {
+			iresults = append(iresults, reflect.ValueOf(res))
+		}
+
+		return iresults, nil
 	})
 
 	env["newAt"] = reflectlang.LowerFunc(env, func(args []reflect.Value) ([]reflect.Value, error) {

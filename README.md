@@ -26,7 +26,7 @@ func (m *MyType) Get() int  { return m.x }
 func main() {
 	space := crawlspace.New(nil)
 	space.RegisterVal("x", &MyType{})
-	panic(crawlspace.ListenAndServe(2222))
+	panic(crawlspace.ListenAndServe("localhost:2222"))
 }
 ```
 

@@ -55,6 +55,11 @@ func New(env func(out io.Writer) reflectlang.Environment) *Crawlspace {
 // there is an error, or the user runs `quit()`. In the case of the input
 // returning io.EOF or the user entering `quit()`, no error will be returned.
 func (m *Crawlspace) Interact(in io.Reader, out io.Writer) error {
+	_, err := fmt.Fprintf(out, "Crawlspace %s\n", crawlspaceVersion)
+	if err != nil {
+		return err
+	}
+
 	env := m.env(out)
 	eof := false
 	env["quit"] = reflect.ValueOf(func() { eof = true })
@@ -104,10 +109,10 @@ func (m *Crawlspace) Interact(in io.Reader, out io.Writer) error {
 	return nil
 }
 
-// ListenAndServe listens on localhost with the given port. It calls Serve
-// with an appropriate listener
-func (m *Crawlspace) ListenAndServe(port int) error {
-	l, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
+// ListenAndServe listens on the given address. It calls Serve with an
+// appropriate listener.
+func (m *Crawlspace) ListenAndServe(addr string) error {
+	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
