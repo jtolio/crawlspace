@@ -4,13 +4,20 @@ import (
 	"runtime/debug"
 )
 
-var crawlspaceVersion = func() string {
+const packageName = "github.com/jtolio/crawlspace"
+
+var crawlspaceVersion string
+var processVersion string
+
+func init() {
+	crawlspaceVersion = packageName + "@v0.0.0-unknown"
+	processVersion = "main@(devel)"
 	if bi, ok := debug.ReadBuildInfo(); ok {
+		processVersion = bi.Main.Path + "@" + bi.Main.Version
 		for _, mod := range bi.Deps {
-			if mod.Path == "github.com/jtolio/crawlspace" {
-				return mod.Version
+			if mod.Path == packageName {
+				crawlspaceVersion = packageName + "@" + mod.Version
 			}
 		}
 	}
-	return "v0.0.0-unknown"
-}()
+}

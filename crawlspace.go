@@ -55,7 +55,7 @@ func New(env func(out io.Writer) reflectlang.Environment) *Crawlspace {
 // there is an error, or the user runs `quit()`. In the case of the input
 // returning io.EOF or the user entering `quit()`, no error will be returned.
 func (m *Crawlspace) Interact(in io.Reader, out io.Writer) error {
-	_, err := fmt.Fprintf(out, "Crawlspace %s\n", crawlspaceVersion)
+	_, err := fmt.Fprintf(out, "%s\n%s\n", crawlspaceVersion, processVersion)
 	if err != nil {
 		return err
 	}
