@@ -214,16 +214,28 @@ func Env(out io.Writer) reflectlang.Environment {
 	})
 
 	env["dir"] = reflect.ValueOf(func(args ...interface{}) []string {
-		if len(args) == 0 {
-			var names []string
+		handleEnv := func(env reflectlang.Environment) []string {
+			names := []string{}
 			for key := range env {
-				names = append(names, key)
+				if !strings.HasPrefix(key, "$") {
+					names = append(names, key)
+				}
 			}
 			sort.Strings(names)
 			return names
 		}
+		if len(args) == 0 {
+			return handleEnv(env)
+		}
 
-		var fields []string
+		if sub := reflectlang.IsLowerStruct(args[0]); sub != nil {
+			return handleEnv(sub)
+		}
+		if reflectlang.IsLowerFunc(args[0]) {
+			return []string{}
+		}
+
+		fields := []string{}
 		handle := func(typ reflect.Type) {
 			for i := 0; i < typ.NumMethod(); i++ {
 				fields = append(fields, typ.Method(i).Name)
@@ -263,43 +275,8 @@ func Env(out io.Writer) reflectlang.Environment {
 		return result, nil
 	})
 
-	env["catch"] = reflect.ValueOf(func(args ...interface{}) []interface{} { return args })
-
-	env["def"] = reflectlang.LowerFunc(env, func(args []reflect.Value) ([]reflect.Value, error) {
-		if len(args) != 2 {
-			return nil, fmt.Errorf("def expected 2 arguments")
-		}
-		if args[0].Kind() != reflect.String {
-			return nil, fmt.Errorf("def expected the left argument to be a string")
-		}
-		key := args[0].String()
-		if _, exists := env[key]; exists {
-			return nil, fmt.Errorf("key %q exists", key)
-		}
-		env[key] = args[1]
-		return []reflect.Value{}, nil
-	})
-
-	env["mut"] = reflectlang.LowerFunc(env, func(args []reflect.Value) ([]reflect.Value, error) {
-		if len(args) != 2 {
-			return nil, fmt.Errorf("mut expected 2 arguments")
-		}
-		if args[0].Kind() != reflect.String {
-			return nil, fmt.Errorf("mut expected the left argument to be a string")
-		}
-		key := args[0].String()
-		if _, exists := env[key]; !exists {
-			return nil, fmt.Errorf("key %q does not exist", key)
-		}
-		env[key] = args[1]
-		return []reflect.Value{}, nil
-	})
-
-	env["len"] = reflectlang.LowerFunc(env, func(args []reflect.Value) ([]reflect.Value, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("len expected 1 argument")
-		}
-		return []reflect.Value{reflect.ValueOf(args[0].Len())}, nil
+	env["$import"] = reflectlang.LowerFunc(env, func(args []reflect.Value) ([]reflect.Value, error) {
+		return nil, fmt.Errorf("TODO: unimplemented: %q", args)
 	})
 
 	return env

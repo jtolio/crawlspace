@@ -63,13 +63,6 @@ func (m *Crawlspace) Interact(in io.Reader, out io.Writer) error {
 	env := m.env(out)
 	eof := false
 	env["quit"] = reflect.ValueOf(func() { eof = true })
-	var lastvals []reflect.Value
-	env["_"] = reflectlang.LowerFunc(env, func(args []reflect.Value) ([]reflect.Value, error) {
-		if len(args) != 0 {
-			return nil, fmt.Errorf("unexpected argument")
-		}
-		return lastvals, nil
-	})
 
 	stdin := bufio.NewReader(in)
 	for !eof {
@@ -98,7 +91,12 @@ func (m *Crawlspace) Interact(in io.Reader, out io.Writer) error {
 			}
 			continue
 		}
-		lastvals = rv
+		env["_"] = reflectlang.LowerFunc(env, func(args []reflect.Value) ([]reflect.Value, error) {
+			if len(args) != 0 {
+				return nil, fmt.Errorf("unexpected argument")
+			}
+			return rv, nil
+		})
 		for _, val := range rv {
 			_, err = fmt.Fprintf(out, "%#v\n", val)
 			if err != nil {

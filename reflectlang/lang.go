@@ -22,16 +22,6 @@ var (
 	durationSuffixes = []string{"ns", "us", "µs", "ms", "s", "m", "h"}
 )
 
-type Environment map[string]reflect.Value
-
-func NewEnvironment() Environment {
-	return map[string]reflect.Value{
-		"nil":   reflect.ValueOf(nil),
-		"true":  reflect.ValueOf(true),
-		"false": reflect.ValueOf(false),
-	}
-}
-
 type Evaluable interface {
 	Run(env Environment) ([]reflect.Value, error)
 }
@@ -738,11 +728,157 @@ func (p *Parser) parseExpression() (Evaluable, error) {
 	return p.parseDisjunction()
 }
 
+func (p *Parser) parseImport() (Evaluable, error) {
+	cp := p.checkpoint()
+	if p.string(len("import ")) != "import " {
+		return nil, nil
+	}
+	if err := p.advance(len("import ")); err != nil {
+		return nil, err
+	}
+	if _, err := p.skipAllWhitespace(); err != nil {
+		return nil, err
+	}
+	var target *Value
+	if p.string(1) == "." {
+		target = &Value{Val: reflect.ValueOf(".")}
+		if err := p.advance(1); err != nil {
+			return nil, err
+		}
+		if _, err := p.skipAllWhitespace(); err != nil {
+			return nil, err
+		}
+	} else {
+		ident, err := p.parseIdentifier()
+		if err != nil {
+			return nil, err
+		}
+		if ident != nil {
+			target = &Value{Val: reflect.ValueOf(ident.Name)}
+		}
+	}
+
+	pkg, err := p.parseString()
+	if err != nil {
+		return nil, err
+	}
+	if pkg == nil {
+		p.restore(cp)
+		return nil, nil
+	}
+	rv := &Call{
+		Func: &Ident{
+			Name: "$import",
+			pos:  cp,
+		},
+		Args: []Evaluable{
+			pkg,
+		},
+		pos: cp,
+	}
+
+	if target != nil {
+		rv.Args = append(rv.Args, target)
+	}
+
+	return rv, nil
+}
+
+func (p *Parser) parseAssignment() (Evaluable, error) {
+	// TODO: parse field, array, or map assignment
+	// TODO: parse multiple rhs expressions
+
+	cp := p.checkpoint()
+	var lhs []Evaluable
+
+	first, err := p.parseIdentifier()
+	if err != nil || first == nil {
+		p.restore(cp)
+		return nil, err
+	}
+	lhs = append(lhs, &Value{Val: reflect.ValueOf(first.Name)})
+
+	extension := ""
+
+lhsParsing:
+	for {
+		switch {
+		case p.string(1) == ",":
+			if err := p.advance(1); err != nil {
+				return nil, err
+			}
+			if _, err := p.skipAllWhitespace(); err != nil {
+				return nil, err
+			}
+			next, err := p.parseIdentifier()
+			if err != nil || next == nil {
+				p.restore(cp)
+				return nil, err
+			}
+			lhs = append(lhs, &Value{Val: reflect.ValueOf(next.Name)})
+			continue lhsParsing
+
+		case p.string(1) == "=":
+			if err := p.advance(1); err != nil {
+				return nil, err
+			}
+			extension = "$mutate"
+			break lhsParsing
+
+		case p.string(2) == ":=":
+			if err := p.advance(2); err != nil {
+				return nil, err
+			}
+			extension = "$define"
+			break lhsParsing
+
+		default:
+			p.restore(cp)
+			return nil, nil
+		}
+	}
+
+	if _, err := p.skipAllWhitespace(); err != nil {
+		return nil, err
+	}
+
+	rhs, err := p.parseExpression()
+	if err != nil || rhs == nil {
+		p.restore(cp)
+		return nil, err
+	}
+
+	return &Call{
+		Func: &Call{
+			Func: &Ident{
+				Name: extension,
+				pos:  cp,
+			},
+			Args: lhs,
+			pos:  cp,
+		},
+		Args: []Evaluable{rhs},
+		pos:  cp,
+	}, nil
+}
+
+func (p *Parser) parseStatement() (Evaluable, error) {
+	stmt, err := p.parseImport()
+	if stmt != nil || err != nil {
+		return stmt, err
+	}
+	stmt, err = p.parseAssignment()
+	if stmt != nil || err != nil {
+		return stmt, err
+	}
+	return p.parseExpression()
+}
+
 func (p *Parser) Parse() (Evaluable, error) {
 	if _, err := p.skipAllWhitespace(); err != nil {
 		return nil, err
 	}
-	val, err := p.parseExpression()
+	val, err := p.parseStatement()
 	if err != nil {
 		return nil, err
 	}
@@ -794,6 +930,11 @@ func LowerFunc(env Environment, fn func([]reflect.Value) ([]reflect.Value, error
 	})
 }
 
+func IsLowerFunc(v interface{}) bool {
+	_, ok := v.(lowerFunc)
+	return ok
+}
+
 func (c *Call) Run(env Environment) ([]reflect.Value, error) {
 	fn, err := c.pos.singleValue(c.Func.Run(env))
 	if err != nil {
@@ -828,19 +969,30 @@ func (c *Call) Run(env Environment) ([]reflect.Value, error) {
 }
 
 type lowerStruct struct {
-	Env   Environment
-	Field func(name string) ([]reflect.Value, error)
+	Env Environment
+	Sub Environment
 }
 
 func LowerStruct(env Environment, sub Environment) reflect.Value {
 	return reflect.ValueOf(lowerStruct{
 		Env: env,
-		Field: func(name string) ([]reflect.Value, error) {
-			if v, ok := sub[name]; ok {
-				return []reflect.Value{v}, nil
-			}
-			return nil, fmt.Errorf("%w: field %q in LowerStruct not found", ErrTypeMismatch, name)
-		}})
+		Sub: sub,
+	})
+}
+
+func (ls *lowerStruct) Field(name string) ([]reflect.Value, error) {
+	if v, ok := ls.Sub[name]; ok {
+		return []reflect.Value{v}, nil
+	}
+	return nil, fmt.Errorf("%w: field %q in LowerStruct not found",
+		ErrTypeMismatch, name)
+}
+
+func IsLowerStruct(v interface{}) Environment {
+	if v, ok := v.(lowerStruct); ok {
+		return v.Sub
+	}
+	return nil
 }
 
 type FieldAccess struct {
