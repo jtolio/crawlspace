@@ -48,7 +48,17 @@ func Env(out io.Writer) reflectlang.Environment {
 		}),
 	})
 
-	env["packages"] = reflect.ValueOf(func() []string {
+	env["reflect"] = reflectlang.LowerStruct(env, reflectlang.Environment{
+		"NewAt": reflect.ValueOf(reflect.NewAt),
+	})
+
+	env["unsafe"] = reflectlang.LowerStruct(env, reflectlang.Environment{
+		"Pointer": reflect.ValueOf(func(thing int64) unsafe.Pointer {
+			return unsafe.Pointer(uintptr(thing))
+		}),
+	})
+
+	env["packages"] = reflect.ValueOf(func(contains string) []string {
 		pkgs := map[string]bool{}
 		process := func(names []string) {
 			for _, name := range names {
@@ -90,127 +100,12 @@ func Env(out io.Writer) reflectlang.Environment {
 
 		names = make([]string, 0, len(pkgs))
 		for pkg := range pkgs {
-			names = append(names, pkg)
-		}
-		sort.Strings(names)
-		return names
-	})
-
-	filterNames := func(pkg string, names []string) []string {
-		pkg += "."
-		var filtered []string
-		for _, name := range names {
-			if strings.HasPrefix(name, pkg) {
-				filtered = append(filtered, strings.TrimPrefix(name, pkg))
-			}
-		}
-		sort.Strings(filtered)
-		return filtered
-	}
-
-	env["globals"] = reflect.ValueOf(func(pkg string) []string {
-		rv, err := troop.Globals()
-		assert(err)
-		return filterNames(pkg, rv)
-	})
-
-	env["global"] = reflectlang.LowerFunc(env, func(args []reflect.Value) ([]reflect.Value, error) {
-		if len(args) != 2 {
-			return nil, fmt.Errorf("global expected 2 arguments")
-		}
-		for _, arg := range args {
-			if arg.Kind() != reflect.String {
-				return nil, fmt.Errorf("global expected the arguments to be strings")
-			}
-		}
-
-		pkg := args[0].String()
-		name := args[1].String()
-		rv, err := troop.Global(pkg + "." + name)
-		if err != nil {
-			return nil, err
-		}
-		return []reflect.Value{rv}, nil
-	})
-
-	env["functions"] = reflect.ValueOf(func(pkg string) []string {
-		rv, err := troop.Functions()
-		assert(err)
-		return filterNames(pkg, rv)
-	})
-
-	env["types"] = reflect.ValueOf(func(pkg string) []string {
-		rv, err := troop.Types()
-		assert(err)
-		var names []string
-		for _, typ := range rv {
-			if typ.PkgPath() == pkg {
-				names = append(names, typ.Name())
+			if strings.Contains(pkg, contains) {
+				names = append(names, pkg)
 			}
 		}
 		sort.Strings(names)
 		return names
-	})
-
-	env["filter"] = reflect.ValueOf(func(haystack []string, needle string) []string {
-		var rv []string
-		for _, hay := range haystack {
-			if strings.Contains(hay, needle) {
-				rv = append(rv, hay)
-			}
-		}
-		return rv
-	})
-
-	env["call"] = reflectlang.LowerFunc(env, func(args []reflect.Value) (_ []reflect.Value, err error) {
-		if len(args) < 2 {
-			return nil, fmt.Errorf("call expected at least 2 arguments")
-		}
-		if args[0].Kind() != reflect.String {
-			return nil, fmt.Errorf("call expected the first argument to be a string")
-		}
-		if args[1].Kind() != reflect.String {
-			return nil, fmt.Errorf("call expected the second argument to be a string")
-		}
-
-		iargs := make([]interface{}, 0, len(args)-2)
-		for _, arg := range args[2:] {
-			// TODO: can we leave these reflect.Values?
-			iargs = append(iargs, arg.Interface())
-		}
-
-		results, err := troop.Call(args[0].String()+"."+args[1].String(), iargs...)
-		if err != nil {
-			return nil, err
-		}
-
-		var iresults []reflect.Value
-		for _, res := range results {
-			iresults = append(iresults, reflect.ValueOf(res))
-		}
-
-		return iresults, nil
-	})
-
-	env["newAt"] = reflectlang.LowerFunc(env, func(args []reflect.Value) ([]reflect.Value, error) {
-		if len(args) != 3 {
-			return nil, fmt.Errorf("newAt expected 3 arguments")
-		}
-		if args[0].Kind() != reflect.String {
-			return nil, fmt.Errorf("newAt expected the first argument to be a string")
-		}
-		if args[1].Kind() != reflect.String {
-			return nil, fmt.Errorf("newAt expected the second argument to be a string")
-		}
-		if !args[2].CanInt() {
-			return nil, fmt.Errorf("newAt expected the third argument to be an integer")
-		}
-
-		typ, err := troop.Type(args[0].String() + "." + args[1].String())
-		if err != nil {
-			return nil, err
-		}
-		return []reflect.Value{reflect.NewAt(typ, unsafe.Pointer(uintptr(args[2].Int())))}, nil
 	})
 
 	env["dir"] = reflect.ValueOf(func(args ...interface{}) []string {
@@ -303,6 +198,16 @@ func Env(out io.Writer) reflectlang.Environment {
 			envToFill = reflectlang.Environment{}
 
 			env[target] = reflectlang.LowerStruct(env, envToFill)
+		}
+
+		types, err := troop.Types()
+		if err != nil {
+			return nil, err
+		}
+		for _, typ := range types {
+			if typ.PkgPath() == pkgName {
+				envToFill[typ.Name()] = reflect.ValueOf(typ)
+			}
 		}
 
 		scanList := func(names []string, loader func(name string) (reflect.Value, error)) error {

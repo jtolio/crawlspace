@@ -235,7 +235,7 @@ func (p *Parser) parseChars(allowed func(rune) bool) (string, error) {
 
 func isUniquelyFloatingPointChar(c rune) bool {
 	switch c {
-	case '.', 'e', 'E', '+', '-', 'p', 'P': // floating point
+	case '.', '+', '-', 'p', 'P': // floating point
 		return true
 	}
 	return false

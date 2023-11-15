@@ -51,36 +51,31 @@ experience.
 And here's an example history inspecting a process:
 
 ```
-> filter(packages(), "net")
-[]string{"net", "net/http"}
-
-> import "net/http"
-> dir(http)
-[]string{"Get", "DefaultClient", ...}
-
-> (*try.E1(net.LookupIP("google.com")))[0].String()
-"2607:f8b0:4009:81c::200e"
-
-> (*try.E1(net.LookupIP("google.com")))[1].String()
-"142.251.32.14"
-
-> newAt("net", "conn", 0x40003711b8).RemoteAddr().String()
-"127.0.0.1:57538"
-
-> dir()
-[]string{"call", "catch", "debugServer", "def", "dir", "false", "filter", "functions", "global", "globals", "len", "mut", "newAt", "nil", "packages", "pretty", "printf", "println", "quit", "sudo", "true", "try", "types"}
-
-> x := newAt("net", "conn", 0x40001321c0)
-> x
-&net.conn{fd:(*net.netFD)(0x4000598000)}
-
-> dir(x)
+~/dev/crawlspace-test$ telnet localhost 2222
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+github.com/jtolio/crawlspace@v0.0.0-20231013070742-9283b10c8cf6
+github.com/jtolio/crawlspace-test@(devel)
+> import "net"
+> conn := reflect.NewAt(net.conn, unsafe.Pointer(0xc0000440d0)).Interface()
+> conn
+(*net.conn)(0xc0000440d0)
+> dir(conn)
 []string{"Close", "File", "LocalAddr", "Read", "RemoteAddr", "SetDeadline", "SetReadBuffer", "SetReadDeadline", "SetWriteBuffer", "SetWriteDeadline", "Write", "fd"}
-
-> x.LocalAddr()
-(*net.TCPAddr)(0x400057e300)
-> x.LocalAddr().String()
-"127.0.0.1:7778"
+> conn.RemoteAddr()
+(*net.TCPAddr)(0xc00007fcb0)
+> addr := conn.RemoteAddr()
+> addr.String()
+"127.0.0.1:38880"
+> dir(addr)
+[]string{"AddrPort", "IP", "Network", "Port", "String", "Zone"}
+> ips, err := net.LookupIP("google.com")
+> ips[1]
+net.IP{0xac, 0xd9, 0x1, 0x6e}
+> ips[1].String()
+"172.217.1.110"
+>
 ```
 
 Copyright 2015-2023, JT Olds. Licensed under Apache License 2.0
