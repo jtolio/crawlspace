@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -179,6 +180,22 @@ func (p *Parser) skipAllWhitespace() (bool, error) {
 
 func isIdentifierChar(c rune) bool {
 	return c == '_' || unicode.IsLetter(c) || unicode.IsDigit(c)
+}
+
+func IsIdentifier(v string) bool {
+	chars := []rune(v)
+	if len(chars) == 0 {
+		return false
+	}
+	if unicode.IsDigit(chars[0]) {
+		return false
+	}
+	for _, c := range chars {
+		if !isIdentifierChar(c) {
+			return false
+		}
+	}
+	return true
 }
 
 func (p *Parser) parseIdentifier() (*Ident, error) {
@@ -739,7 +756,7 @@ func (p *Parser) parseImport() (Evaluable, error) {
 	if _, err := p.skipAllWhitespace(); err != nil {
 		return nil, err
 	}
-	var target *Value
+	target := &Value{Val: reflect.ValueOf("")}
 	if p.string(1) == "." {
 		target = &Value{Val: reflect.ValueOf(".")}
 		if err := p.advance(1); err != nil {
@@ -772,13 +789,10 @@ func (p *Parser) parseImport() (Evaluable, error) {
 			pos:  cp,
 		},
 		Args: []Evaluable{
+			target,
 			pkg,
 		},
 		pos: cp,
-	}
-
-	if target != nil {
-		rv.Args = append(rv.Args, target)
 	}
 
 	return rv, nil
@@ -1247,4 +1261,19 @@ func Eval(expression string, env Environment) (_ []reflect.Value, err error) {
 		}
 	}()
 	return val.Run(env)
+}
+
+func Repr(x reflect.Value) string {
+	if IsLowerFunc(x.Interface()) {
+		return "<function>"
+	}
+	if sub := IsLowerStruct(x.Interface()); sub != nil {
+		keys := make([]string, 0, len(sub))
+		for k := range sub {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		return "{" + strings.Join(keys, ", ") + "}"
+	}
+	return fmt.Sprintf("%#v", x)
 }

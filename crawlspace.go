@@ -98,7 +98,7 @@ func (m *Crawlspace) Interact(in io.Reader, out io.Writer) error {
 			return rv, nil
 		})
 		for _, val := range rv {
-			_, err = fmt.Fprintf(out, "%#v\n", val)
+			_, err = fmt.Fprintf(out, "%s\n", reflectlang.Repr(val))
 			if err != nil {
 				return err
 			}

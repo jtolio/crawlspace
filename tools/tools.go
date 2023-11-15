@@ -23,7 +23,7 @@ func assert(err error) {
 }
 
 func Env(out io.Writer) reflectlang.Environment {
-	env := reflectlang.NewEnvironment()
+	env := reflectlang.NewStandardEnvironment()
 	env["pretty"] = reflectlang.LowerStruct(env, reflectlang.Environment{
 		"Sprint": reflect.ValueOf(pretty.Sprint),
 	})
@@ -276,7 +276,86 @@ func Env(out io.Writer) reflectlang.Environment {
 	})
 
 	env["$import"] = reflectlang.LowerFunc(env, func(args []reflect.Value) ([]reflect.Value, error) {
-		return nil, fmt.Errorf("TODO: unimplemented: %q", args)
+
+		if len(args) != 2 {
+			return nil, fmt.Errorf("import expected 2 arguments")
+		}
+		if args[0].Kind() != reflect.String {
+			return nil, fmt.Errorf("import expected a target name argument")
+		}
+		if args[1].Kind() != reflect.String {
+			return nil, fmt.Errorf("import expected a package name")
+		}
+
+		target := args[0].String()
+		pkgName := args[1].String()
+
+		if target == "_" {
+			return nil, nil
+		}
+		var envToFill reflectlang.Environment
+		if target == "." {
+			envToFill = env
+		} else {
+			if target == "" {
+				target = importPathToNameBasic(pkgName)
+			}
+			envToFill = reflectlang.Environment{}
+
+			env[target] = reflectlang.LowerStruct(env, envToFill)
+		}
+
+		scanList := func(names []string, loader func(name string) (reflect.Value, error)) error {
+			for _, name := range names {
+				if !strings.HasPrefix(name, pkgName+".") {
+					continue
+				}
+				localName := strings.TrimPrefix(name, pkgName+".")
+				if !reflectlang.IsIdentifier(localName) {
+					continue
+				}
+				global, err := loader(name)
+				if err != nil {
+					return err
+				}
+				envToFill[localName] = global
+			}
+			return nil
+		}
+
+		globals, err := troop.Globals()
+		if err != nil {
+			return nil, err
+		}
+		if err = scanList(globals, troop.Global); err != nil {
+			return nil, err
+		}
+
+		functions, err := troop.Functions()
+		if err != nil {
+			return nil, err
+		}
+		return nil, scanList(functions, func(name string) (reflect.Value, error) {
+			return reflectlang.LowerFunc(env, func(args []reflect.Value) (_ []reflect.Value, err error) {
+				iargs := make([]interface{}, 0, len(args))
+				for _, arg := range args {
+					// TODO: can we leave these reflect.Values?
+					iargs = append(iargs, arg.Interface())
+				}
+
+				results, err := troop.Call(name, iargs...)
+				if err != nil {
+					return nil, err
+				}
+
+				var iresults []reflect.Value
+				for _, res := range results {
+					iresults = append(iresults, reflect.ValueOf(res))
+				}
+
+				return iresults, nil
+			}), nil
+		})
 	})
 
 	return env

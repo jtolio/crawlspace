@@ -7,12 +7,14 @@ import (
 
 type Environment map[string]reflect.Value
 
-func NewEnvironment() Environment {
-	env := map[string]reflect.Value{
-		"nil":   reflect.ValueOf(nil),
-		"true":  reflect.ValueOf(true),
-		"false": reflect.ValueOf(false),
-	}
+func NewStandardEnvironment() Environment {
+	env := Environment{}
+	env["nil"] = reflect.ValueOf(nil)
+	env["true"] = reflect.ValueOf(true)
+	env["false"] = reflect.ValueOf(false)
+	env["$import"] = LowerFunc(env, func(args []reflect.Value) ([]reflect.Value, error) {
+		return nil, fmt.Errorf("import unsupported in this session")
+	})
 
 	assignment := func(mutate bool) reflect.Value {
 		return LowerFunc(env, func(lhs []reflect.Value) ([]reflect.Value, error) {
