@@ -1272,16 +1272,18 @@ func Repr(x reflect.Value) string {
 	if x == (reflect.Value{}) {
 		return "nil"
 	}
-	if IsLowerFunc(x.Interface()) {
-		return "<function>"
-	}
-	if sub := IsLowerStruct(x.Interface()); sub != nil {
-		keys := make([]string, 0, len(sub))
-		for k := range sub {
-			keys = append(keys, k)
+	if x.CanInterface() {
+		if IsLowerFunc(x.Interface()) {
+			return "<function>"
 		}
-		sort.Strings(keys)
-		return "{" + strings.Join(keys, ", ") + "}"
+		if sub := IsLowerStruct(x.Interface()); sub != nil {
+			keys := make([]string, 0, len(sub))
+			for k := range sub {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			return "{" + strings.Join(keys, ", ") + "}"
+		}
 	}
 	return fmt.Sprintf("%#v", x)
 }
