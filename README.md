@@ -52,30 +52,27 @@ https://github.com/zeebo/goof.
 And here's an example history inspecting a process:
 
 ```
-~/dev/crawlspace-test$ telnet localhost 2222
 Trying 127.0.0.1...
 Connected to localhost.
 Escape character is '^]'.
 github.com/jtolio/crawlspace@v0.0.0-20231013070742-9283b10c8cf6
 github.com/jtolio/crawlspace-test@(devel)
 > import "net"
-> conn := reflect.NewAt(net.conn, unsafe.Pointer(uintptr(0xc0000440d0))).Interface()
-> conn
-(*net.conn)(0xc0000440d0)
+> import "reflect"
+> import "unsafe"
+> conn := reflect.NewAt(net.conn, unsafe.Pointer(uintptr(0xc00028e038))).Interface()
 > dir(conn)
 []string{"Close", "File", "LocalAddr", "Read", "RemoteAddr", "SetDeadline", "SetReadBuffer", "SetReadDeadline", "SetWriteBuffer", "SetWriteDeadline", "Write", "fd"}
-> conn.RemoteAddr()
-(*net.TCPAddr)(0xc00007fcb0)
 > addr := conn.RemoteAddr()
 > addr.String()
-"127.0.0.1:38880"
+"127.0.0.1:43868"
 > dir(addr)
 []string{"AddrPort", "IP", "Network", "Port", "String", "Zone"}
 > ips, err := net.LookupIP("google.com")
-> ips[1]
-net.IP{0xac, 0xd9, 0x1, 0x6e}
+> err
+nil
 > ips[1].String()
-"172.217.1.110"
+"172.217.2.46"
 >
 ```
 
