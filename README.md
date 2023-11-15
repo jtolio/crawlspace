@@ -41,8 +41,9 @@ to localhost:2222, and run the following interaction:
 5
 ```
 
-If you import the `github.com/jtolds/crawlspace/tools`, you can have a better
-experience.
+If you import the `github.com/jtolds/crawlspace/tools` package, you can have an
+extremely powerful experience that doesn't require type registration, driven by
+https://github.com/zeebo/goof.
 
 ```
 	space := crawlspace.New(tools.Env)
