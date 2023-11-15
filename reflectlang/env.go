@@ -22,16 +22,18 @@ func NewStandardEnvironment() Environment {
 				if arg.Kind() != reflect.String {
 					return nil, fmt.Errorf("programmer error")
 				}
-				key := arg.String()
-				if mutate {
-					if _, exists := env[key]; !exists {
-						return nil, fmt.Errorf("variable %q does not exist", key)
+				/*
+					key := arg.String()
+					if mutate {
+						if _, exists := env[key]; !exists {
+							return nil, fmt.Errorf("variable %q does not exist", key)
+						}
+					} else {
+						if _, exists := env[key]; exists {
+							return nil, fmt.Errorf("variable %q already exists", key)
+						}
 					}
-				} else {
-					if _, exists := env[key]; exists {
-						return nil, fmt.Errorf("variable %q already exists", key)
-					}
-				}
+				*/
 			}
 			return []reflect.Value{
 				LowerFunc(env, func(rhs []reflect.Value) ([]reflect.Value, error) {

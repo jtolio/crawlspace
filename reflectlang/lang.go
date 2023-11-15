@@ -972,11 +972,16 @@ func (c *Call) Run(env Environment) ([]reflect.Value, error) {
 		args = append(args, arg)
 	}
 
-	if fn.Kind() == reflect.Struct {
-		if lf, ok := fn.Interface().(lowerFunc); ok &&
-			reflect.ValueOf(lf.Env).Pointer() == reflect.ValueOf(env).Pointer() {
-			return lf.Func(args)
+	if lf, ok := fn.Interface().(lowerFunc); ok &&
+		reflect.ValueOf(lf.Env).Pointer() == reflect.ValueOf(env).Pointer() {
+		return lf.Func(args)
+	}
+
+	if typ, ok := fn.Interface().(reflect.Type); ok {
+		if len(args) != 1 {
+			return nil, c.pos.Err(ErrTypeMismatch, "tried to cast more than one argument to %s", typ.Name())
 		}
+		return []reflect.Value{convert(args[0], typ)}, nil
 	}
 
 	return fn.Call(args), nil
@@ -1264,6 +1269,9 @@ func Eval(expression string, env Environment) (_ []reflect.Value, err error) {
 }
 
 func Repr(x reflect.Value) string {
+	if x == (reflect.Value{}) {
+		return "nil"
+	}
 	if IsLowerFunc(x.Interface()) {
 		return "<function>"
 	}

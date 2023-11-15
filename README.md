@@ -59,7 +59,7 @@ Escape character is '^]'.
 github.com/jtolio/crawlspace@v0.0.0-20231013070742-9283b10c8cf6
 github.com/jtolio/crawlspace-test@(devel)
 > import "net"
-> conn := reflect.NewAt(net.conn, unsafe.Pointer(0xc0000440d0)).Interface()
+> conn := reflect.NewAt(net.conn, unsafe.Pointer(uintptr(0xc0000440d0))).Interface()
 > conn
 (*net.conn)(0xc0000440d0)
 > dir(conn)

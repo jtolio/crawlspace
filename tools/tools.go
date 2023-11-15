@@ -24,8 +24,13 @@ func assert(err error) {
 
 func Env(out io.Writer) reflectlang.Environment {
 	env := reflectlang.NewStandardEnvironment()
-	env["pretty"] = reflectlang.LowerStruct(env, reflectlang.Environment{
-		"Sprint": reflect.ValueOf(pretty.Sprint),
+
+	env["$forcedImports"] = reflect.ValueOf(func() []interface{} {
+		return []interface{}{
+			reflect.NewAt,
+			reflect.TypeOf(unsafe.Pointer(nil)),
+			pretty.Sprint,
+		}
 	})
 
 	env["try"] = reflectlang.LowerStruct(env, reflectlang.Environment{
@@ -48,17 +53,19 @@ func Env(out io.Writer) reflectlang.Environment {
 		}),
 	})
 
-	env["reflect"] = reflectlang.LowerStruct(env, reflectlang.Environment{
-		"NewAt": reflect.ValueOf(reflect.NewAt),
-	})
+	env["int64"] = reflect.ValueOf(reflect.TypeOf(int64(0)))
+	env["uint64"] = reflect.ValueOf(reflect.TypeOf(uint64(0)))
+	env["int"] = reflect.ValueOf(reflect.TypeOf(int(0)))
+	env["uint"] = reflect.ValueOf(reflect.TypeOf(uint(0)))
+	env["uintptr"] = reflect.ValueOf(reflect.TypeOf(uintptr(0)))
+	env["int32"] = reflect.ValueOf(reflect.TypeOf(int32(0)))
+	env["uint32"] = reflect.ValueOf(reflect.TypeOf(uint32(0)))
+	env["float32"] = reflect.ValueOf(reflect.TypeOf(float32(0)))
+	env["float64"] = reflect.ValueOf(reflect.TypeOf(float64(0)))
+	env["string"] = reflect.ValueOf(reflect.TypeOf(string("")))
+	env["byte"] = reflect.ValueOf(reflect.TypeOf(byte(0)))
 
-	env["unsafe"] = reflectlang.LowerStruct(env, reflectlang.Environment{
-		"Pointer": reflect.ValueOf(func(thing int64) unsafe.Pointer {
-			return unsafe.Pointer(uintptr(thing))
-		}),
-	})
-
-	env["packages"] = reflect.ValueOf(func(contains string) []string {
+	env["packages"] = reflect.ValueOf(func(contains ...string) []string {
 		pkgs := map[string]bool{}
 		process := func(names []string) {
 			for _, name := range names {
@@ -100,7 +107,14 @@ func Env(out io.Writer) reflectlang.Environment {
 
 		names = make([]string, 0, len(pkgs))
 		for pkg := range pkgs {
-			if strings.Contains(pkg, contains) {
+			okayToAdd := true
+			for _, needle := range contains {
+				if !strings.Contains(pkg, needle) {
+					okayToAdd = false
+					break
+				}
+			}
+			if okayToAdd {
 				names = append(names, pkg)
 			}
 		}
@@ -108,10 +122,20 @@ func Env(out io.Writer) reflectlang.Environment {
 		return names
 	})
 
+	topLevelDirSuppressions := map[string]reflect.Value{}
+	for _, name := range []string{
+		"byte", "false", "float32", "float64", "int", "int32", "int64", "len",
+		"nil", "string", "true", "uint", "uint32", "uint64", "uintptr"} {
+		topLevelDirSuppressions[name] = env[name]
+	}
+
 	env["dir"] = reflect.ValueOf(func(args ...interface{}) []string {
-		handleEnv := func(env reflectlang.Environment) []string {
+		handleEnv := func(sub reflectlang.Environment, isEnv bool) []string {
 			names := []string{}
-			for key := range env {
+			for key, val := range sub {
+				if isEnv && val == topLevelDirSuppressions[key] {
+					continue
+				}
 				if !strings.HasPrefix(key, "$") {
 					names = append(names, key)
 				}
@@ -120,11 +144,11 @@ func Env(out io.Writer) reflectlang.Environment {
 			return names
 		}
 		if len(args) == 0 {
-			return handleEnv(env)
+			return handleEnv(env, true)
 		}
 
 		if sub := reflectlang.IsLowerStruct(args[0]); sub != nil {
-			return handleEnv(sub)
+			return handleEnv(sub, false)
 		}
 		if reflectlang.IsLowerFunc(args[0]) {
 			return []string{}
@@ -196,8 +220,6 @@ func Env(out io.Writer) reflectlang.Environment {
 				target = importPathToNameBasic(pkgName)
 			}
 			envToFill = reflectlang.Environment{}
-
-			env[target] = reflectlang.LowerStruct(env, envToFill)
 		}
 
 		types, err := troop.Types()
@@ -240,7 +262,7 @@ func Env(out io.Writer) reflectlang.Environment {
 		if err != nil {
 			return nil, err
 		}
-		return nil, scanList(functions, func(name string) (reflect.Value, error) {
+		if err = scanList(functions, func(name string) (reflect.Value, error) {
 			return reflectlang.LowerFunc(env, func(args []reflect.Value) (_ []reflect.Value, err error) {
 				iargs := make([]interface{}, 0, len(args))
 				for _, arg := range args {
@@ -260,7 +282,18 @@ func Env(out io.Writer) reflectlang.Environment {
 
 				return iresults, nil
 			}), nil
-		})
+		}); err != nil {
+			return nil, err
+		}
+
+		if target != "." {
+			if len(envToFill) == 0 {
+				return nil, fmt.Errorf("package %q not found", pkgName)
+			}
+			env[target] = reflectlang.LowerStruct(env, envToFill)
+		}
+
+		return nil, nil
 	})
 
 	return env
