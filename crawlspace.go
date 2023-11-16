@@ -54,8 +54,13 @@ func New(env func(out io.Writer) reflectlang.Environment) *Crawlspace {
 // Interact takes input from `in` and returns output to `out`. It runs until
 // there is an error, or the user runs `quit()`. In the case of the input
 // returning io.EOF or the user entering `quit()`, no error will be returned.
-func (m *Crawlspace) Interact(in io.Reader, out io.Writer) error {
-	_, err := fmt.Fprintf(out, "%s\n%s\n", crawlspaceVersion, processVersion)
+func (m *Crawlspace) Interact(in io.Reader, out io.Writer) (err error) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("panic: %+v", rec)
+		}
+	}()
+	_, err = fmt.Fprintf(out, "%s\n%s\n", crawlspaceVersion, processVersion)
 	if err != nil {
 		return err
 	}
