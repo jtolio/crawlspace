@@ -1,0 +1,16 @@
+github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
+github.com/jtolio/crawlspace v0.0.0-20231116162947-3ec5cc6b36c5 h1:RSt5K+VT7bPr6A9DW/8Kav6V6aYB+8Vqn6ygqp6S0UM=
+github.com/jtolio/crawlspace v0.0.0-20231116162947-3ec5cc6b36c5/go.mod h1:ruaBEBN4k5AmKzmI6K2LsfLno2t5tPgvSUB2dyiHHqo=
+github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
+github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=
+github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
+github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
+github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=
+github.com/rogpeppe/go-internal v1.9.0 h1:73kH8U+JUqXU8lRuOHeVHaa/SZPifC7BkcraZVejAe8=
+github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
+github.com/zeebo/errs v1.3.0 h1:hmiaKqgYZzcVgRL1Vkc1Mn2914BbzB0IBxs+ebeutGs=
+github.com/zeebo/errs v1.3.0/go.mod h1:sgbWHsvVuTPHcqJJGQ1WhI5KbWlHYz+2+2C/LSEtCw4=
+github.com/zeebo/goof v0.0.0-20230907150950-e9457bc94477 h1:W/fHn8aWJEBCQcLeeNBoWToCxB6H/j9hu2Gopnzmp+k=
+github.com/zeebo/goof v0.0.0-20230907150950-e9457bc94477/go.mod h1:nbQ8jtLiWGVGehuiqVKJp/Oc9FnzA56AZ0tG/srGTGY=
+github.com/zeebo/sudo v1.0.2 h1:6RpQNYeWtd7ycPwYSRgceNdbjodamyyuapNB8mQ1V0M=
+github.com/zeebo/sudo v1.0.2/go.mod h1:bO8DB2LXZchv4WMBzo1sCYp24BxAtwa0Lp0XTXU3cU4=
